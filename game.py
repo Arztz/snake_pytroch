@@ -31,7 +31,7 @@ BLUE2 = (0, 100, 255)
 BLACK = (0,0,0)
 
 BLOCK_SIZE = 20
-SPEED = 20
+SPEED = 200
 
 class SnakeGameAI:
     
@@ -111,7 +111,17 @@ class SnakeGameAI:
             return True
         
         return False
+    def is_collision2(self,pt=None):
+        if pt is None:
+            pt = self.head
+        # hits boundary
+        if pt.x > self.w - BLOCK_SIZE*2 or pt.x < -1 or pt.y > self.h - BLOCK_SIZE*2 or pt.y < -1:
+            return True
+        # hits itself
+        if pt in self.snake[1:]:
+            return True
         
+        return False        
     def _update_ui(self):
         self.display.fill(BLACK)
         

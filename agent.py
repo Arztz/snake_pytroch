@@ -4,8 +4,10 @@ import numpy as np
 from collections import deque
 from game import SnakeGameAI, Direction, Point
 from model import Linear_QNet, QTrainer
+import torch.nn as nn
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 MAX_MEMORY = 100_000
-BATCH_SIZE = 1000
+BATCH_SIZE = 10000
 LR = 0.001
 from helper import plot
 
@@ -15,17 +17,26 @@ class Agent:
         self.epsilon = 0 #control randomness
         self.gamma = 0.9 # discount rate
         self.memory = deque(maxlen=MAX_MEMORY) # popleft()
-        self.model = Linear_QNet(11, 256, 3) # input size, hidden size, output size
+        # self.model = Linear_QNet(11, 256, 3) # input size, hidden size, output size
+        model = Linear_QNet(14, 256, 3)  # ถ้ามี GPU หลายตัว ให้ครอบ DataParallel
+        if torch.cuda.device_count() > 1:
+            print("ใช้ DataParallel กับจำนวน GPU =", torch.cuda.device_count())
+            model = nn.DataParallel(model)
+        self.model = model.to(device)
         self.trainer = QTrainer(self.model, lr=LR, gamma=self.gamma)
-        # TODO: model, trainer
     
     def get_state(self,game):
+        BLOCK_SIZE = 20
         head = game.snake[0]
         # 4 directions
-        point_l = Point(head.x - 20, head.y)
-        point_r = Point(head.x + 20, head.y)
-        point_u = Point(head.x, head.y - 20)
-        point_d = Point(head.x, head.y + 20)
+        point_l = Point(head.x - BLOCK_SIZE, head.y)
+        point_r = Point(head.x + BLOCK_SIZE, head.y)
+        point_u = Point(head.x, head.y - BLOCK_SIZE)
+        point_d = Point(head.x, head.y + BLOCK_SIZE)
+        point_l2 = Point(head.x - 2*BLOCK_SIZE, head.y)
+        point_r2 = Point(head.x + 2*BLOCK_SIZE, head.y)
+        point_u2 = Point(head.x, head.y - 2*BLOCK_SIZE)
+        point_d2 = Point(head.x, head.y + 2*BLOCK_SIZE)
 
         dir_l = game.direction == Direction.LEFT
         dir_r = game.direction == Direction.RIGHT
@@ -54,6 +65,23 @@ class Agent:
             (dir_u and game.is_collision(point_l)) or 
             (dir_r and game.is_collision(point_u)) or 
             (dir_l and game.is_collision(point_d)),
+            # Danger straight 2
+            # Danger straight
+            (dir_r and game.is_collision2(point_r2)) or 
+            (dir_l and game.is_collision2(point_l2)) or 
+            (dir_u and game.is_collision2(point_u2)) or 
+            (dir_d and game.is_collision2(point_d2)),
+            # Danger right
+            (dir_u and game.is_collision2(point_r2)) or 
+            (dir_d and game.is_collision2(point_l2)) or 
+            (dir_l and game.is_collision2(point_u2)) or 
+            (dir_r and game.is_collision2(point_d2)),
+            # Danger left
+            (dir_d and game.is_collision2(point_r2)) or 
+            (dir_u and game.is_collision2(point_l2)) or 
+            (dir_r and game.is_collision2(point_u2)) or 
+            (dir_l and game.is_collision2(point_d2)),
+
             # Move direction
             dir_l,
             dir_r,
@@ -91,8 +119,8 @@ class Agent:
             move = random.randint(0, 2)
             final_move[move] = 1
         else:
-            state0 = torch.tensor(state, dtype=torch.float)
-            prediction = self.model(state0)
+            state0 = torch.tensor(state, dtype=torch.float).to(device)
+            prediction = self.model(state0).to(device)
             move = torch.argmax(prediction).item()
             final_move[move] = 1
         return final_move

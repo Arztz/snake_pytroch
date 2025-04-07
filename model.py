@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 import os
-
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class Linear_QNet(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
         super().__init__()
@@ -32,10 +32,10 @@ class QTrainer:
         self.criterion = nn.MSELoss()
 
     def train_step(self, state, action, reward, next_state, done):
-        state = torch.tensor(state, dtype=torch.float)
-        next_state = torch.tensor(next_state, dtype=torch.float)
-        action = torch.tensor(action, dtype=torch.float)
-        reward = torch.tensor(reward, dtype=torch.float)
+        state = torch.tensor(state, dtype=torch.float).to(device)
+        next_state = torch.tensor(next_state, dtype=torch.float).to(device)
+        action = torch.tensor(action, dtype=torch.float).to(device)
+        reward = torch.tensor(reward, dtype=torch.float).to(device)
         #(n,x)
         if len(state.shape) == 1:
             # single sample #(1,x)
@@ -47,7 +47,7 @@ class QTrainer:
         
         # 1. predicted Q value from the current state
         # Q value from model
-        pred = self.model(state)
+        pred = self.model(state).to(device)
         # 2. Q_new = r + y * max(next_predict Q value) > do if not done
         # pred.clone()
         # pred[argmax(action)] = Q_new
